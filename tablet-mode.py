@@ -26,15 +26,11 @@ def check_state():
 def toggle():
     current_state = check_state()
     if current_state:
-        with open(KEYBOARD_INHIBIT, "w") as f:
-            f.write("1")
-        with open(TOUCHPAD_INHIBIT, "w") as f:
-            f.write("1")
+        subprocess.run(["sudo", "tee", KEYBOARD_INHIBIT], input="1", text=True, check=True)
+        subprocess.run(["sudo", "tee", TOUCHPAD_INHIBIT], input="1", text=True, check=True)
     else:
-        with open(KEYBOARD_INHIBIT, "w") as f:
-            f.write("0")
-        with open(TOUCHPAD_INHIBIT, "w") as f:
-            f.write("0")
+        subprocess.run(["sudo", "tee", KEYBOARD_INHIBIT], input="0", text=True, check=True)
+        subprocess.run(["sudo", "tee", TOUCHPAD_INHIBIT], input="0", text=True, check=True)
 
 def draw():
     current_state = check_state()
@@ -56,7 +52,10 @@ def on_toggle(icon, item):
     toggle()
     icon.icon = draw()
 
-menu = pystray.Menu(pystray.MenuItem("Toggle", on_toggle))
+def icon_quit(icon, item):
+    icon.stop()
+
+menu = pystray.Menu(pystray.MenuItem("Toggle", on_toggle), pystray.MenuItem("Quit", icon_quit))
 icon = pystray.Icon("tablet_toggle", draw(), "Toggle Keyboard/Touchpad", menu)
 
 icon.run()
