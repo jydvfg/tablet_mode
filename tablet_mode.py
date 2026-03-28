@@ -1,7 +1,10 @@
 import pystray
 from PIL import Image, ImageDraw
 import subprocess
-import os
+import threading
+import pydbus
+import time
+
 
 KEYBOARD_INHIBIT = "/sys/class/input/event3/device/inhibited"
 TOUCHPAD_INHIBIT = "/sys/class/input/event5/device/inhibited"
@@ -55,7 +58,48 @@ def on_toggle(icon, item):
 def icon_quit(icon, item):
     icon.stop()
 
-menu = pystray.Menu(pystray.MenuItem("Toggle", on_toggle), pystray.MenuItem("Quit", icon_quit))
-icon = pystray.Icon("tablet_toggle", draw(), "Toggle Keyboard/Touchpad", menu)
 
-icon.run()
+def get_current_rotation():
+    bus = pydbus.SessionBus()
+    dc = bus.get('org.gnome.Mutter.DisplayConfig', '/org/gnome/Mutter/DisplayConfig')
+    state = dc.GetCurrentState()
+    for cfg in state[2]:
+        for out in cfg[5]:
+            if out[0] == 'eDP-1':
+                return ['normal', 'right', 'inverted', 'left'][cfg[3]]
+    return 'normal'
+
+def rotate_right():
+    current = get_current_rotation()
+    new = None
+    match current:
+        case "normal":
+            new = "right"
+        case "right":
+            new = "inverted"
+        case "inverted":
+            new = "left"
+        case "left":
+            new = "normal"
+
+    subprocess.run(["/home/juan-yuste-del-valle/.cargo/bin/gnome-randr", "modify", "eDP-1", "--rotate", new])
+
+def rotate_left():
+    current = get_current_rotation()
+    new = None
+    match current:
+        case "normal":
+            new = "left"
+        case "left":
+            new = "inverted"
+        case "inverted":
+            new = "right"
+        case "right":
+            new = "normal"
+    subprocess.run(["/home/juan-yuste-del-valle/.cargo/bin/gnome-randr", "modify", "eDP-1", "--rotate", new])
+
+
+menu = pystray.Menu(pystray.MenuItem("Toggle", on_toggle), pystray.MenuItem("Quit", icon_quit), pystray.MenuItem("Rotate right", rotate_right), pystray.MenuItem("Rotate left", rotate_left))
+icon = pystray.Icon("tablet_toggle", draw(), "Toggle Keyboard/Touchpad", menu)
+if __name__ == "__main__":
+    icon.run()
