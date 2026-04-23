@@ -4,10 +4,24 @@ import subprocess
 import threading
 import pydbus
 import time
+import glob
 
 
-KEYBOARD_INHIBIT = "/sys/class/input/event3/device/inhibited"
-TOUCHPAD_INHIBIT = "/sys/class/input/event5/device/inhibited"
+def get_device(device_name):
+    for name_file in glob.glob("/sys/class/input/event*/device/name"):
+        try:
+            with open(name_file, 'r') as f:
+                content = f.read().strip()
+                if content == device_name:
+                    parts = name_file.split('/')
+                    event_dir = next(p for p in parts if p.startswith('event'))
+                    return f"/sys/class/input/{event_dir}/device/inhibited"
+        except:
+            continue
+    return None
+
+KEYBOARD_INHIBIT = get_device("AT Translated Set 2 keyboard")
+TOUCHPAD_INHIBIT = get_device("ELAN030D:00 04F3:3352 Touchpad")
 
 def check_state():
     k_state = 0
@@ -29,11 +43,15 @@ def check_state():
 def toggle():
     current_state = check_state()
     if current_state:
-        subprocess.run(["sudo", "tee", KEYBOARD_INHIBIT], input="1", text=True, check=True)
-        subprocess.run(["sudo", "tee", TOUCHPAD_INHIBIT], input="1", text=True, check=True)
+        with open(KEYBOARD_INHIBIT, "w") as f:
+            f.write("1")
+        with open(TOUCHPAD_INHIBIT, "w") as f:
+            f.write("1")
     else:
-        subprocess.run(["sudo", "tee", KEYBOARD_INHIBIT], input="0", text=True, check=True)
-        subprocess.run(["sudo", "tee", TOUCHPAD_INHIBIT], input="0", text=True, check=True)
+        with open(KEYBOARD_INHIBIT, "w") as f:
+            f.write("0")
+        with open(TOUCHPAD_INHIBIT, "w") as f:
+            f.write("0")
 
 def draw():
     current_state = check_state()
@@ -101,5 +119,4 @@ def rotate_left():
 
 menu = pystray.Menu(pystray.MenuItem("Toggle", on_toggle), pystray.MenuItem("Quit", icon_quit), pystray.MenuItem("Rotate right", rotate_right), pystray.MenuItem("Rotate left", rotate_left))
 icon = pystray.Icon("tablet_toggle", draw(), "Toggle Keyboard/Touchpad", menu)
-if __name__ == "__main__":
-    icon.run()
+icon.run()
