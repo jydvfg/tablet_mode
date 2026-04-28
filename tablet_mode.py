@@ -5,6 +5,7 @@ import threading
 import pydbus
 import time
 import glob
+import re
 
 
 def get_device(device_name):
@@ -78,43 +79,43 @@ def icon_quit(icon, item):
 
 
 def get_current_rotation():
-    bus = pydbus.SessionBus()
-    dc = bus.get('org.gnome.Mutter.DisplayConfig', '/org/gnome/Mutter/DisplayConfig')
-    state = dc.GetCurrentState()
-    for cfg in state[2]:
-        for out in cfg[5]:
-            if out[0] == 'eDP-1':
-                return ['normal', 'right', 'inverted', 'left'][cfg[3]]
-    return 'normal'
+    result = subprocess.run(["kscreen-doctor", "--outputs"], capture_output=True, text=True)
+    dc = result.stdout
+    ansi_escape = re.compile(r'\x1b\[[0-9;]*m')
+    clean_dc = ansi_escape.sub('', dc)
+    match = re.search(r"eDP-1\s+.*?Rotation:\s*(\d+)", clean_dc, re.DOTALL)
+    if match:
+        rotation_number = match.group(1)
+    return rotation_number
 
 def rotate_right():
     current = get_current_rotation()
     new = None
     match current:
-        case "normal":
+        case "1":
             new = "right"
-        case "right":
+        case "8":
             new = "inverted"
-        case "inverted":
+        case "4":
             new = "left"
-        case "left":
+        case "2":
             new = "normal"
 
-    subprocess.run(["/home/juan-yuste-del-valle/.cargo/bin/gnome-randr", "modify", "eDP-1", "--rotate", new])
+    subprocess.run(["kscreen-doctor", f"output.eDP-1.rotation.{new}"])
 
 def rotate_left():
     current = get_current_rotation()
     new = None
     match current:
-        case "normal":
+        case "1":
             new = "left"
-        case "left":
+        case "2":
             new = "inverted"
-        case "inverted":
+        case "4":
             new = "right"
-        case "right":
+        case "8":
             new = "normal"
-    subprocess.run(["/home/juan-yuste-del-valle/.cargo/bin/gnome-randr", "modify", "eDP-1", "--rotate", new])
+    subprocess.run(["kscreen-doctor", f"output.eDP-1.rotation.{new}"])
 
 
 menu = pystray.Menu(pystray.MenuItem("Toggle", on_toggle), pystray.MenuItem("Quit", icon_quit), pystray.MenuItem("Rotate right", rotate_right), pystray.MenuItem("Rotate left", rotate_left))
